@@ -1,12 +1,14 @@
 {
-  "name": "ddos-script",
+  "name": "proxy-script",
   "version": "1.0.0",
-  "description": "DDoS attack script",
-  "main": "server.js",
+  "description": "proxy script",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.17.1"
+    "express": "^4.17.1",
+    "node-fetch": "^2.6.1",
+    "node-cron": "^2.0.3"
   }
 }
