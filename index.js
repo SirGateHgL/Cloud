@@ -45,6 +45,11 @@ async function updateProxies() {
     console.log('Proxy lists updated');
 }
 
+app.get('/info', (req, res) => {
+  res.set('Content-Type', 'text/plain');
+    res.send('This Things Made by @SirgateHgL');
+});
+
 app.get('/http', (req, res) => {
     res.set('Content-Type', 'text/plain');
     res.send(httpProxies.join('\n'));
